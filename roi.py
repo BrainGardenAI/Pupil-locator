@@ -69,6 +69,7 @@ def extract_eye_regions(landmark_detector, image):
 
     Returns:
     rois_coords -- list of tuples (x1, x2, y1, y2)
+    eyes - list of contours of shape (-1, 1, 2) 
     """
 
     rows, cols, _ = image.shape
