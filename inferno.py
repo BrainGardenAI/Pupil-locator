@@ -1,15 +1,17 @@
-import argparse
-import os
-import time
-
-import cv2
-import numpy as np
 import tensorflow.compat.v1 as tf
+import numpy as np
+import argparse
+import time
+import json
+import cv2
+import os
 
+from utils import annotator, change_channel, gray_normalizer, data_generator, smooth_contour, eye_aspect_ratio
+from models import Simple, NASNET, Inception, GAP, YOLO
 from config import config
 from logger import Logger
-from models import Simple, NASNET, Inception, GAP, YOLO
-from utils import annotator, change_channel, gray_normalizer
+from tqdm import tqdm
+
 
 tf.disable_v2_behavior()
 
@@ -113,9 +115,8 @@ def upscale_preds(_preds, _shapes):
     return x, y, w
 
 
-# load a the model with the best saved state from file and predict the pupil location
-# on the input video. finaly save the video with the predicted pupil on disk
-def main(m_type, m_name, logger, video_path=None, write_output=True):
+
+def main_video(m_type, m_name, logger, video_path=None, write_output=True):
     with tf.Session() as sess:
 
         # load best model
@@ -173,6 +174,77 @@ def main(m_type, m_name, logger, video_path=None, write_output=True):
     print("Done...")
 
 
+# load a the model with the best saved state from file and predict the pupil location
+# on the input video. finaly save the video with the predicted pupil on disk
+def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=True):
+    from tensorflow.compat.v1 import ConfigProto
+    from tensorflow.compat.v1 import InteractiveSession
+    
+    # this thing fixes something
+    _config = ConfigProto()
+    _config.gpu_options.allow_growth = True
+    session = InteractiveSession(config=_config)
+    # ---
+
+    with tf.Session() as sess:
+
+        # load best model
+        model = load_model(sess, m_type, m_name, logger)
+
+        with open(data_path + '/data.json', 'r') as fp:
+            eye_info = json.load(fp)
+
+        for data_item in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
+            actor = data_item['actor']
+            segment = data_item['segment']
+            idx = data_item['idx']
+            image = data_item['image']
+
+            rois_coords = eye_info[actor][segment][idx]['roi']
+            contours = eye_info[actor][segment][idx]['cnt']
+            eye1 = np.array(contours[0]).reshape((-1, 1, 2))
+            eye2 = np.array(contours[1]).reshape((-1, 1, 2))
+            eyes = [eye1, eye2]
+
+            # create empty mask to draw on
+            result = np.zeros(image.shape, np.uint8)
+            
+            for i, (x1, x2, y1, y2) in enumerate(rois_coords):
+                if eye_aspect_ratio(eyes[i]) < 0.2:
+                    continue
+                cv2.drawContours(result, [eyes[i]], 0, (255, 255, 255), -1) # fill the eye region with white color
+                roi = image[y1 : y2, x1 : x2] # get the original eye region
+
+                # preprocessing for the pupil detection model
+                roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                shape = roi_gray.shape
+                if roi_gray.shape[0] != 192:
+                    roi_gray = rescale(roi_gray)
+                roi_gray = gray_normalizer(roi_gray)
+                roi_gray = change_channel(roi_gray, config["input_channel"])
+                # ---
+
+                [p] = model.predict(sess, [roi_gray])
+
+                x, y, w = upscale_preds(p, shape)
+                x, y, w = [int(item) for item in (x, y, w)]
+
+                # draw the circle indicating a pupil
+                roi = result[y1 : y2, x1 : x2]
+                cv2.circle(roi, (x, y), 9, (0, 0, 255), -1)
+
+                result[y1 : y2, x1 : x2] = roi
+                # ---
+
+            path = os.path.dirname(os.path.abspath(f'{data_path}/{actor}/real/{segment}'))
+            path = path + '/' + segment + '/eye_regions/'
+            if not os.path.exists(path):
+                os.mkdir(path)
+            cv2.imwrite(f'{path}{idx}.jpg', cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+
+    print("Done...")
+
+
 if __name__ == "__main__":
     class_ = argparse.ArgumentDefaultsHelpFormatter
     parser = argparse.ArgumentParser(description=__doc__,
@@ -186,8 +258,14 @@ if __name__ == "__main__":
                         help="name of saved model (3A4Bh-Ref25)",
                         default="3A4Bh-Ref25")
 
-    parser.add_argument('video_path',
+    parser.add_argument('--video_path',
                         help="path to video file, empty for camera")
+
+    parser.add_argument('--data_path',
+                        help="path to a folder containing images, empty for video or camera")
+    
+    parser.add_argument('--actors', nargs='+', type=str,
+                        help="list of actors to process")
 
     args = parser.parse_args()
 
@@ -195,9 +273,16 @@ if __name__ == "__main__":
     model_name = args.model_name
     model_type = args.model_type
     video_path = args.video_path
+    data_path = args.data_path
+    actors = args.actors or []
+
 
     # initial a logger
     logger = Logger(model_type, model_name, "", config, dir="models/")
     logger.log("Start inferring model...")
 
-    main(model_type, model_name, logger, video_path)
+    # if video_path is not None:
+    #     main_video(model_type, model_name, logger, video_path)
+    
+    if data_path is not None:
+        main_images(model_type, model_name, logger, data_path, actors)

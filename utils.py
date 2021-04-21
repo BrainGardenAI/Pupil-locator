@@ -1,9 +1,11 @@
+import numpy as np
+import cv2
 import os
 
-import cv2
-import numpy as np
-
+from scipy.interpolate import splprep, splev
 from config import config
+from skimage import io
+from glob import glob
 
 
 def check_dir(path):
@@ -197,6 +199,57 @@ def load_dict(load_path):
 
     print("Class dict loaded successfuly at: {}".format(load_path))
     return dict
+
+
+def smooth_contour(cnt):
+    x, y = cnt.T
+    x = x.tolist()[0]
+    y = y.tolist()[0]
+
+    tck, u = splprep([x, y], u=None, s=1.0, per=1)
+    u_new = np.linspace(u.min(), u.max(), 10)
+    x_new, y_new = splev(u_new, tck, der=0)
+    res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new,y_new)]
+    return np.array(res_array, dtype=np.int32)
+
+
+def data_generator(data_path, actors):
+    if not len(actors):
+        actor_list = glob(data_path + '/*/')
+    else:
+        actor_list = [f'{data_path}/{actor}/' for actor in actors]
+
+    for actor_path in actor_list:
+        segment_list = glob(actor_path + 'real/*/') # TODO: add virtual folder 
+        actor_key = actor_path[:-1].split('/')[-1]
+
+        for segment_path in segment_list:
+            frames = glob(segment_path + 'frames/*.jpg')
+            segment_key = segment_path[:-1].split('/')[-1]
+            
+            for path in frames:
+                image = io.imread(path)
+                idx = path.split('/')[-1][:-4]
+
+                yield {
+                    'actor': actor_key,
+                    'segment': segment_key,
+                    'idx': idx, 
+                    'image': image
+                }
+
+
+def distance(u, v):
+    diff = u - v
+    return np.sqrt((diff**2).sum())
+
+
+def eye_aspect_ratio(cnt):
+    cnt = cnt.reshape(-1, 2)
+    numerator = distance(cnt[1], cnt[5]) + distance(cnt[2], cnt[4])
+    denomenator = 2 * distance(cnt[0], cnt[3])
+    return numerator / denomenator
+
 
 if __name__ == "__main__":
     ag = Augmentor('data/noisy_videos', config)
