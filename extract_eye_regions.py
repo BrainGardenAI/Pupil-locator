@@ -49,7 +49,12 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError
 
-    data_dict = HierarchicalDict()
+    if os.path.exists(data_path + '/data.json'):
+        json_path = data_path + '/data.json'
+    else:
+        json_path = None
+
+    data_dict = HierarchicalDict(json_path)
 
     for data_element in tqdm(data_generator(data_path, actors)):
         keys = data_element.keys
