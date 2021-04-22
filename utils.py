@@ -3,9 +3,13 @@ import cv2
 import os
 
 from scipy.interpolate import splprep, splev
+from collections import namedtuple
 from config import config
 from skimage import io
 from glob import glob
+
+
+DataElement = namedtuple('DataElement', ['keys', 'item'])
 
 
 def check_dir(path):
@@ -219,24 +223,33 @@ def data_generator(data_path, actors):
     else:
         actor_list = [f'{data_path}/{actor}/' for actor in actors]
 
+    keys = []
     for actor_path in actor_list:
-        segment_list = glob(actor_path + 'real/*/') # TODO: add virtual folder 
-        actor_key = actor_path[:-1].split('/')[-1]
+        actor_key = os.path.basename(actor_path[:-1]) # [:-1] because last character is '/'
+        keys.append(actor_key)
+        domain_list = glob(actor_path + '*/')
+        
+        for domain_path in domain_list:
+            domain_key = os.path.basename(domain_path[:-1])
+            keys.append(domain_key)
+            segment_list = glob(domain_path + '*/')
 
-        for segment_path in segment_list:
-            frames = glob(segment_path + 'frames/*.jpg')
-            segment_key = segment_path[:-1].split('/')[-1]
-            
-            for path in frames:
-                image = io.imread(path)
-                idx = path.split('/')[-1][:-4]
+            for segment_path in segment_list:
+                segment_key = os.path.basename(segment_path[:-1])
+                keys.append(segment_key)
+                frames = glob(segment_path + 'frames/*.jpg')
 
-                yield {
-                    'actor': actor_key,
-                    'segment': segment_key,
-                    'idx': idx, 
-                    'image': image
-                }
+                for frame_path in frames:
+                    image = io.imread(frame_path)
+                    frame_key = os.path.basename(frame_path)[:-4]
+                    keys.append(frame_key)
+                    yield DataElement(keys, image)
+                    keys.pop()
+                keys.pop()
+            keys.pop()
+        keys.pop()
+
+
 
 
 def distance(u, v):
