@@ -8,6 +8,7 @@ import os
 
 from utils import annotator, change_channel, gray_normalizer, data_generator, smooth_contour, eye_aspect_ratio
 from models import Simple, NASNET, Inception, GAP, YOLO
+from hierarchical_dict import HierarchicalDict
 from config import config
 from logger import Logger
 from tqdm import tqdm
@@ -115,7 +116,6 @@ def upscale_preds(_preds, _shapes):
     return x, y, w
 
 
-
 def main_video(m_type, m_name, logger, video_path=None, write_output=True):
     with tf.Session() as sess:
 
@@ -190,18 +190,16 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
 
         # load best model
         model = load_model(sess, m_type, m_name, logger)
+        
+        eye_info = HierarchicalDict(path=data_path + '/data.json')
 
-        with open(data_path + '/data.json', 'r') as fp:
-            eye_info = json.load(fp)
+        for data_element in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
+            keys = data_element.keys
+            image = data_element.item
 
-        for data_item in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
-            actor = data_item['actor']
-            segment = data_item['segment']
-            idx = data_item['idx']
-            image = data_item['image']
+            rois_coords = eye_info[keys]['roi']
+            contours = eye_info[keys]['cnt']
 
-            rois_coords = eye_info[actor][segment][idx]['roi']
-            contours = eye_info[actor][segment][idx]['cnt']
             eye1 = np.array(contours[0]).reshape((-1, 1, 2))
             eye2 = np.array(contours[1]).reshape((-1, 1, 2))
             eyes = [eye1, eye2]
@@ -236,11 +234,13 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
                 result[y1 : y2, x1 : x2] = roi
                 # ---
 
-            path = os.path.dirname(os.path.abspath(f'{data_path}/{actor}/real/{segment}'))
-            path = path + '/' + segment + '/eye_regions/'
-            if not os.path.exists(path):
-                os.mkdir(path)
-            cv2.imwrite(f'{path}{idx}.jpg', cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+            if write_output:
+                actor, domain, segment, idx = keys
+                path = os.path.dirname(os.path.abspath(f'{data_path}/{actor}/{domain}/{segment}'))
+                path = path + '/' + segment + '/eye_regions/'
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                cv2.imwrite(f'{path}{idx}.jpg', cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
 
     print("Done...")
 
