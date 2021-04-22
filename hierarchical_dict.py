@@ -18,10 +18,9 @@ class HierarchicalDict:
     
     def __getitem__(self, keys):
         current_level = self.storage
-        for k in keys[:-1]:
+        for k in keys:
             current_level = current_level[k]
-        last_key = keys[-1]
-        return current_level[last_key]
+        return current_level
     
     def __repr__(self):
         return self.storage
