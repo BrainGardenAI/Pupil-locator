@@ -2,6 +2,40 @@ import json
 
 
 class HierarchicalDict:
+    """
+    This class implements dictionary with hierarchical structure. 
+    It is convinient when you need to store data in a hierarchical way.
+    Suppose you have some data folder with a structure like this:
+        Actor1
+            Real
+                VideoSegment1
+                    Frame1
+                    Frame2
+                    ...
+                VideoSegment2
+                    Frame1
+                    ...
+            Virtual
+                VideoSegment1
+                    Frame1
+                    ...
+                ...
+        Actor2
+            ...
+    The deeper the hierarchy, the more unique keys you need to use in order to get to the lowest level.
+    To make the code more simple one can use this class to assign or retrieve elements from different levels 
+    by passing list of keys to  __setitem__ or __getitem__ methods. 
+    In such list i-th element represents the key for i-th level in the hierarchy.
+
+    Example:
+        instead of writing like this
+        frame = Storage[ActorKey][DomainKey][VideoKey][FrameKey]
+
+        you can write like this:
+        keys = [ActorKey, DomainKey, VideoKey, FrameKey]
+        frame = Storage[keys]
+    """
+
     def __init__(self, path=None):
         self.storage = {}
         if path:
@@ -23,7 +57,7 @@ class HierarchicalDict:
         return current_level
     
     def __repr__(self):
-        return self.storage
+        return str(self.storage)
     
     def __str__(self):
         return str(self.storage)
