@@ -47,6 +47,7 @@ class DlibDetector:
     ])
 
     def __init__(self):
+        dlib.DLIB_USE_CUDA = True
         self.detector = dlib.get_frontal_face_detector()
         self.predictor = dlib.shape_predictor('shape_predictor.dat')
 
