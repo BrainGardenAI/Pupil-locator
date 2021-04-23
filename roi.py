@@ -63,7 +63,8 @@ def extract_eye_regions(landmark_detector, image):
 
     eye1 = np.array(eye1).reshape((-1, 1, 2)).astype(np.int32)
     eye2 = np.array(eye2).reshape((-1, 1, 2)).astype(np.int32)
-
+    eyes = [eye1, eye2]
+    
     rois_coords = [get_roi(eye, rows, cols) for eye in eyes]
 
     return rois_coords, eyes
