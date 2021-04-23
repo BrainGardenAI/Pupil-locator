@@ -191,7 +191,7 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
         # load best model
         model = load_model(sess, m_type, m_name, logger)
         
-        eye_info = HierarchicalDict(path=data_path + '/data.json')
+        eye_info = HierarchicalDict(path=data_path + '/eye_data.json')
 
         for data_element in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
             keys = data_element.keys
@@ -237,7 +237,7 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
             if write_output:
                 actor, domain, segment, idx = keys
                 path = os.path.dirname(os.path.abspath(f'{data_path}/{actor}/{domain}/{segment}'))
-                path = path + '/' + segment + '/eye_regions/'
+                path = path + '/' + segment + '/original_renders/eye_regions/'
                 if not os.path.exists(path):
                     os.mkdir(path)
                 cv2.imwrite(f'{path}{idx}.jpg', cv2.cvtColor(result, cv2.COLOR_BGR2RGB))

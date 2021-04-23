@@ -49,8 +49,8 @@ if __name__ == '__main__':
     else:
         raise NotImplementedError
 
-    if os.path.exists(data_path + '/data.json'):
-        json_path = data_path + '/data.json'
+    if os.path.exists(data_path + '/eye_data.json'):
+        json_path = data_path + '/eye_data.json'
     else:
         json_path = None
 
@@ -68,5 +68,5 @@ if __name__ == '__main__':
             'cnt': contours
         }
 
-    data_dict.save_json(data_path + '/data.json')
+    data_dict.save_json(data_path + '/eye_data.json')
     print('Done.')
