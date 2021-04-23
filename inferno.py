@@ -196,7 +196,10 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
         for data_element in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
             keys = data_element.keys
             image = data_element.item
-
+            
+            if not eye_info.check_key(keys):
+                continue
+            
             rois_coords = eye_info[keys]['roi']
             contours = eye_info[keys]['cnt']
 

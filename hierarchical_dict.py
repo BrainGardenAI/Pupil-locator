@@ -61,6 +61,14 @@ class HierarchicalDict:
     
     def __str__(self):
         return str(self.storage)
+
+    def check_key(self, keys):
+        current_level = self.storage
+        for k in keys:
+            if k not in current_level.keys():
+                return False
+            current_level = current_level[k]
+        return True
     
     def save_json(self, path):
         with open(path, 'w') as fp:
