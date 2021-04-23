@@ -53,7 +53,8 @@ class DlibDetector:
 
     def get_eyes(self, image):
         face_rect = self.detector(image)
-        assert len(face_rect) != 0
+        if len(face_rect) == 0:
+            return None
         landmarks = self.predictor(image, face_rect[0])
 
         right_eye_indices = self._landmark_to_idx['right_eye']
@@ -64,7 +65,7 @@ class DlibDetector:
         
         right_eye = np.array(right_eye).reshape(-1, 1, 2)
         left_eye = np.array(left_eye).reshape(-1, 1, 2)
-        return right_eye, left_eye
+        return [right_eye, left_eye]
     
     def _get_part(self, landmarks, indices):
         landmarks_coords = []

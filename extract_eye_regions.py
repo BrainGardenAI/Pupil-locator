@@ -60,7 +60,11 @@ if __name__ == '__main__':
         keys = data_element.keys
         image = data_element.item
 
-        roi, contours = extract_eye_regions(landmark_detector, image)
+        result = extract_eye_regions(landmark_detector, image)
+        if not result:
+            continue
+        
+        roi, contours = result
         contours = contours_to_int(contours)
 
         data_dict[keys] = {

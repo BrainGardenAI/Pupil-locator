@@ -6,26 +6,6 @@ import os
 from skimage import io
 
 
-def get_eyes(detector, image):
-    """ 
-    Detects eye contours on the image
-
-    Arguments:
-    detector -- detector model which has landmark prediction method 'get_landmarks'
-    image -- numpy array of shape [h, w, 3], the target image where eyes needs to be extracted from
-
-    Return:
-    Tuple of two contours of shape (-1, 1, 2)
-    """
-
-    eye1, eye2 = detector.get_eyes(image)
-
-    eye1 = np.array(eye1).reshape((-1, 1, 2)).astype(np.int32)
-    eye2 = np.array(eye2).reshape((-1, 1, 2)).astype(np.int32)
-
-    return eye1, eye2
-
-
 def get_roi(countours, img_height, img_width):
     """
     Computes bounding box which must contain all the passed contours 
@@ -75,8 +55,14 @@ def extract_eye_regions(landmark_detector, image):
     rows, cols, _ = image.shape
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    eye1, eye2 = get_eyes(landmark_detector, image)
-    eyes = [eye1, eye2]
+    detection = landmark_detector.get_eyes(image)
+    if not detection:
+        return None
+
+    eye1, eye2 = detection
+
+    eye1 = np.array(eye1).reshape((-1, 1, 2)).astype(np.int32)
+    eye2 = np.array(eye2).reshape((-1, 1, 2)).astype(np.int32)
 
     rois_coords = [get_roi(eye, rows, cols) for eye in eyes]
 
