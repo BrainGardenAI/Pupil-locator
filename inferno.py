@@ -9,6 +9,7 @@ import os
 from utils import annotator, change_channel, gray_normalizer, data_generator, smooth_contour, eye_aspect_ratio
 from models import Simple, NASNET, Inception, GAP, YOLO
 from hierarchical_dict import HierarchicalDict
+from collections import deque
 from config import config
 from logger import Logger
 from tqdm import tqdm
@@ -186,22 +187,32 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
     session = InteractiveSession(config=_config)
     # ---
 
-    with tf.Session() as sess:
-
+    with tf.Session(config=tf.ConfigProto(log_device_placement=True)) as sess:
+        
         # load best model
         model = load_model(sess, m_type, m_name, logger)
         
         eye_info = HierarchicalDict(path=data_path + '/eye_data.json')
 
+        previos_segment = ''
+        current_segment = ''
+        
+
         for data_element in tqdm(data_generator(data_path=data_path, actors=actors), ascii=True):
+        # for data_element in data_generator(data_path=data_path, actors=actors):
             keys = data_element.keys
             image = data_element.item
-            
+
+            current_segment = keys[:-1]
+            if current_segment != previos_segment:
+                last_ars = [deque(maxlen=25) for _ in range(2)]
+
             if not eye_info.check_key(keys):
                 continue
-            
+
             rois_coords = eye_info[keys]['roi']
             contours = eye_info[keys]['cnt']
+            aspect_ratios = eye_info[keys]['ars']
 
             eye1 = np.array(contours[0]).reshape((-1, 1, 2))
             eye2 = np.array(contours[1]).reshape((-1, 1, 2))
@@ -209,33 +220,38 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
 
             # create empty mask to draw on
             result = np.zeros(image.shape, np.uint8)
-            
             for i, (x1, x2, y1, y2) in enumerate(rois_coords):
-                if eye_aspect_ratio(eyes[i]) < 0.2:
+                prev_aspect_ratio = sum(last_ars[i]) / len(last_ars[i]) if len(last_ars[i]) else 0.35
+                current_aspect_ratio = aspect_ratios[i]
+                if current_aspect_ratio < 0.6 * prev_aspect_ratio:
                     continue
-                cv2.drawContours(result, [eyes[i]], 0, (255, 255, 255), -1) # fill the eye region with white color
-                roi = image[y1 : y2, x1 : x2] # get the original eye region
+                last_ars[i].append(current_aspect_ratio)
 
+                roi = image[y1 : y2, x1 : x2] # get the original eye region
                 # preprocessing for the pupil detection model
                 roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                 shape = roi_gray.shape
                 if roi_gray.shape[0] != 192:
                     roi_gray = rescale(roi_gray)
+
                 roi_gray = gray_normalizer(roi_gray)
                 roi_gray = change_channel(roi_gray, config["input_channel"])
                 # ---
-
+                
                 [p] = model.predict(sess, [roi_gray])
 
                 x, y, w = upscale_preds(p, shape)
                 x, y, w = [int(item) for item in (x, y, w)]
 
                 # draw the circle indicating a pupil
-                roi = result[y1 : y2, x1 : x2]
-                cv2.circle(roi, (x, y), 9, (0, 0, 255), -1)
-
-                result[y1 : y2, x1 : x2] = roi
+                if cv2.pointPolygonTest(eyes[i], (x + x1, y + y1), False) != -1:
+                    cv2.drawContours(result, [eyes[i]], 0, (255, 255, 255), -1)
+                    roi = result[y1 : y2, x1 : x2]
+                    cv2.circle(roi, (x, y), 9, (0, 0, 255), -1)
+                    result[y1 : y2, x1 : x2] = roi
                 # ---
+
+            previos_segment = current_segment
 
             if write_output:
                 actor, domain, segment, idx = keys
@@ -245,7 +261,7 @@ def main_images(m_type, m_name, logger, data_path=None, actors=[], write_output=
                     os.mkdir(path)
                 cv2.imwrite(f'{path}{idx}.jpg', cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
 
-    print("Done...")
+    print("Done.")
 
 
 if __name__ == "__main__":
@@ -264,7 +280,7 @@ if __name__ == "__main__":
     parser.add_argument('--video_path',
                         help="path to video file, empty for camera")
 
-    parser.add_argument('--data_path',
+    parser.add_argument('--data-path',
                         help="path to a folder containing images, empty for video or camera")
     
     parser.add_argument('--actors', nargs='+', type=str,

@@ -1,11 +1,18 @@
 import mediapipe as mp
 import numpy as np
+import torch
 import dlib
 import cv2
 
 from face_alignment import FaceAlignment
+from matplotlib import pyplot as plt
 from collections import OrderedDict
+from facenet_pytorch import MTCNN
 from imutils import face_utils
+from PIL import Image
+
+
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 
 class FAN(FaceAlignment):
@@ -74,3 +81,26 @@ class DlibDetector:
             y = landmarks.part(idx).y 
             landmarks_coords.append([x, y])
         return landmarks_coords
+
+
+class MtcnnDetector:
+    def __init__(self):
+        self.model = MTCNN(keep_all=True, device=device)
+    
+    def get_eyes(self, image):
+        image = Image.fromarray(image)
+
+        boxes, probs, landmarks = self.model.detect(image, landmarks=True)
+
+        fig, ax = plt.subplots(figsize=(16, 12))
+        ax.imshow(image)
+        image = np.asarray(image).copy()
+
+        for box, landmark in zip(boxes, landmarks):
+            ax.scatter(*np.meshgrid(box[[0, 2]], box[[1, 3]]))
+            ax.scatter(landmark[:, 0], landmark[:, 1], s=8)
+        plt.show()
+
+        return None
+
+

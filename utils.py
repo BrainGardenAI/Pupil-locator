@@ -228,7 +228,7 @@ def data_generator(data_path, actors):
         actor_key = os.path.basename(actor_path[:-1]) # [:-1] because last character is '/'
         keys.append(actor_key)
         domain_list = glob(actor_path + '*/')
-        
+
         for domain_path in domain_list:
             domain_key = os.path.basename(domain_path[:-1])
             keys.append(domain_key)
@@ -238,7 +238,7 @@ def data_generator(data_path, actors):
                 segment_key = os.path.basename(segment_path[:-1])
                 keys.append(segment_key)
                 frames = glob(segment_path + 'frames/*.jpg')
-
+                frames = sorted(frames, key=lambda x: int(os.path.basename(x)[:-4]))
                 for frame_path in frames:
                     image = io.imread(frame_path)
                     frame_key = os.path.basename(frame_path)[:-4]

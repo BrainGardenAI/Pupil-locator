@@ -3,11 +3,11 @@ import json
 import cv2
 import os
 
-from landmark_detectors import FAN, MediapipeDetector, DlibDetector
+from landmark_detectors import FAN, MediapipeDetector, DlibDetector, MtcnnDetector
+from utils import data_generator, eye_aspect_ratio
 from hierarchical_dict import HierarchicalDict
 from face_alignment import LandmarksType
 from roi import extract_eye_regions
-from utils import data_generator
 from skimage import io
 from glob import glob
 from tqdm import tqdm
@@ -24,7 +24,7 @@ def contours_to_int(contours):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_folder", required=True)
+    parser.add_argument("--data-path", required=True)
     parser.add_argument('--actors', nargs='+', type=str)
     parser.add_argument('--detector', default='FAN')
 
@@ -36,16 +36,19 @@ if __name__ == '__main__':
     else:
         actors = args.actors
     
-    data_path = args.input_folder
+    data_path = args.data_path
 
 
     detector_type = args.detector
-    if detector_type == 'FAN':
+    if detector_type == 'fan':
         landmark_detector = FAN(LandmarksType._2D, flip_input=False)
-    elif detector_type == 'Mediapipe':
+    elif detector_type == 'mediapioe':
         raise NotImplementedError
     elif detector_type == 'dlib':
         landmark_detector = DlibDetector()
+    elif detector_type == 'mtcnn':
+        raise NotImplementedError
+        landmark_detector = MtcnnDetector()
     else:
         raise NotImplementedError
 
@@ -55,6 +58,7 @@ if __name__ == '__main__':
         json_path = None
 
     data_dict = HierarchicalDict(json_path)
+    segment_keys = []
 
     for data_element in tqdm(data_generator(data_path, actors)):
         keys = data_element.keys
@@ -63,13 +67,19 @@ if __name__ == '__main__':
         result = extract_eye_regions(landmark_detector, image)
         if not result:
             continue
-        
+
         roi, contours = result
+        
+        aspect_ratios = [eye_aspect_ratio(cnt) for cnt in contours]
         contours = contours_to_int(contours)
+
+        if keys[:-1] not in segment_keys:
+            segment_keys.append(keys[:-1])
 
         data_dict[keys] = {
             'roi': roi,
-            'cnt': contours
+            'cnt': contours,
+            'ars': aspect_ratios
         }
 
     data_dict.save_json(data_path + '/eye_data.json')
